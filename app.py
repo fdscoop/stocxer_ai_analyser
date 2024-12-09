@@ -9,11 +9,11 @@ app = Flask(__name__)
 
 @app.route('/')
 def index():
-    return "Welcome to the Financial Data Analysis API!"
+    return jsonify({"response": "Welcome to the Financial Data Analysis API!"})
 
 @app.route('/health')
 def health():
-    return jsonify({"status": "healthy"}), 200
+    return jsonify({"response": {"status": "healthy"}}), 200
 
 @app.route('/run-script', methods=['POST'])
 def run_script():
@@ -25,9 +25,11 @@ def run_script():
         # Check if the request is JSON
         if not request.is_json:
             return jsonify({
-                "status": "error", 
-                "message": "Request must be JSON",
-                "details": f"Received content type: {request.content_type}"
+                "response": {
+                    "status": "error", 
+                    "message": "Request must be JSON",
+                    "details": f"Received content type: {request.content_type}"
+                }
             }), 400
         
         # Get data from JSON request
@@ -36,8 +38,10 @@ def run_script():
         # Check if 'data' key exists
         if 'data' not in data:
             return jsonify({
-                "status": "error", 
-                "message": "No 'data' key found in JSON"
+                "response": {
+                    "status": "error", 
+                    "message": "No 'data' key found in JSON"
+                }
             }), 400
         
         # Get the data value
@@ -45,16 +49,20 @@ def run_script():
         
         if not data_string:
             return jsonify({
-                "status": "error", 
-                "message": "Empty data provided"
+                "response": {
+                    "status": "error", 
+                    "message": "Empty data provided"
+                }
             }), 400
         
         # Split the string into rows and group into columns
         rows = [r.strip() for r in data_string.split(',') if r.strip()]
         if len(rows) % 6 != 0:
             return jsonify({
-                "status": "error", 
-                "message": f"Invalid data format. Expected multiple of 6 elements, got {len(rows)}"
+                "response": {
+                    "status": "error", 
+                    "message": f"Invalid data format. Expected multiple of 6 elements, got {len(rows)}"
+                }
             }), 400
             
         formatted_data = [rows[i:i+6] for i in range(0, len(rows), 6)]
@@ -72,16 +80,17 @@ def run_script():
         
         # Convert DataFrame to a list of dictionaries (JSON format)
         result = df.to_dict(orient='records')
-
-        # Construct the JSON response as a dictionary, explicitly ensuring it's an object
+        
+        # Wrap the response in a "response" object for Bubble
         response = {
-            "status": "success",
-            "data": result
+            "response": {
+                "status": "success",
+                "data": result
+            }
         }
-
+        
         # Log the response before returning (for debugging)
         print("Response:", response)
-
         return jsonify(response), 200
         
     except Exception as e:
@@ -90,12 +99,13 @@ def run_script():
         print(traceback.format_exc())
         
         return jsonify({
-            "status": "error", 
-            "message": "Internal server error",
-            "details": str(e)
+            "response": {
+                "status": "error", 
+                "message": "Internal server error",
+                "details": str(e)
+            }
         }), 500
 
-# Add this for Heroku deployment
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
