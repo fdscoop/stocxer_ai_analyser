@@ -1,11 +1,4 @@
-# requirements.txt
 flask
 pandas
 pandas-ta
 gunicorn
-
-# Procfile
-web: gunicorn app:app
-
-# runtime.txt (optional, but recommended)
-python-3.9.16
