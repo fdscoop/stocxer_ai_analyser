@@ -3,3 +3,5 @@ pandas
 pandas-ta
 gunicorn
 numpy
+ta-lib
+ta==0
