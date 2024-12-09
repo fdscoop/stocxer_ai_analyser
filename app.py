@@ -8,7 +8,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def index():
-    return "Welcome to the Stocxer Stock Ananlysis!"
+    return "Welcome to the Stocxer Stock Analysis!"
 
 @app.route('/health')
 def health():
@@ -39,12 +39,15 @@ def run_script():
         df['SMA'] = df['close'].rolling(window=3).mean()
         df['RSI'] = ta.rsi(df['close'])
         
-        # Convert DataFrame to JSON for response
+        # Convert DataFrame to dictionary for JSON response
         result = df.to_dict(orient='records')
-        return jsonify({"status": "success", "data": result})
+        
+        # Explicitly set the Content-Type to application/json
+        return jsonify({"status": "success", "data": result}), 200, {'Content-Type': 'application/json'}
         
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        # In case of an error, return error message
+        return jsonify({"status": "error", "message": str(e)}), 500, {'Content-Type': 'application/json'}
 
 # Add this for Heroku deployment
 if __name__ == '__main__':
