@@ -1,1 +1,3 @@
-pip install Flask pandas pandas_ta
+Flask
+pandas
+pandas_ta
