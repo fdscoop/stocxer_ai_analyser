@@ -10,6 +10,7 @@ Original file is located at
 from flask import Flask, request, jsonify
 import pandas as pd
 import pandas_ta as ta
+import os
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -51,4 +52,6 @@ def run_script():
 
 # Run the Flask app
 if __name__ == "__main__":
-    app.run(debug=True)
+    # Get the port from Heroku's environment or default to 5000 for local development
+    port = int(os.environ.get("PORT", 5000))  # Heroku assigns a dynamic port
+    app.run(debug=True, host="0.0.0.0", port=port)
