@@ -78,14 +78,18 @@ def run_script():
         df['SMA'] = df['close'].rolling(window=3).mean()
         df['RSI'] = ta.rsi(df['close'])
         
-        # Convert DataFrame to a list of dictionaries (JSON format)
-        result = df.to_dict(orient='records')
+        # Convert DataFrame to a list of dictionaries
+        result_list = df.to_dict(orient='records')
         
-        # Wrap the response in a "response" object for Bubble
+        # Convert the list to an object with numeric keys
+        result_object = {str(i): item for i, item in enumerate(result_list)}
+        
+        # Add metadata to help Bubble process the response
         response = {
             "response": {
                 "status": "success",
-                "data": result
+                "total_records": len(result_list),
+                "data": result_object
             }
         }
         
