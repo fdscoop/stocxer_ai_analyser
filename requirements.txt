@@ -2,3 +2,4 @@ flask
 pandas
 pandas-ta
 gunicorn
+numpy
