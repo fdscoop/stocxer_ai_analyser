@@ -1,5 +1,5 @@
 flask
-pandas
-pandas-ta
+numpy==1.23.5  # or a version compatible with pandas_ta
+pandas_ta==0.3.14b  # Replace with your version of pandas_ta
+pandas==2.2.3
 gunicorn
-numpy
