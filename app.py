@@ -1,17 +1,14 @@
 import os
 from flask import Flask, request, jsonify
 import pandas as pd
-import numpy as np
-
-# Optional: Use ta library for RSI if needed
-from ta.momentum import RSIIndicator
+import pandas_ta as ta
 
 # Initialize Flask app
 app = Flask(__name__)
 
 @app.route('/')
 def index():
-    return "Welcome to the Financial Data Analysis API!"
+    return "Welcome to the Stocxer Stock Ananlysis!"
 
 @app.route('/health')
 def health():
@@ -38,12 +35,9 @@ def run_script():
         df['timestamp'] = pd.to_datetime(df['timestamp'])
         df[['open', 'high', 'low', 'close', 'volume']] = df[['open', 'high', 'low', 'close', 'volume']].astype(float)
         
-        # Calculate technical indicators using pandas methods
+        # Apply pandas_ta to calculate technical indicators
         df['SMA'] = df['close'].rolling(window=3).mean()
-        
-        # Calculate RSI using ta library
-        rsi_indicator = RSIIndicator(df['close'])
-        df['RSI'] = rsi_indicator.rsi()
+        df['RSI'] = ta.rsi(df['close'])
         
         # Convert DataFrame to JSON for response
         result = df.to_dict(orient='records')
