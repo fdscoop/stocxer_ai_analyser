@@ -1,24 +1,48 @@
 from flask import Flask, request, jsonify
 import pandas as pd
 import pandas_ta as ta
-import os
 
-# Create the Flask application instance
+# Initialize Flask app
 app = Flask(__name__)
 
 @app.route('/')
 def index():
     return "Welcome to the Flask API!"
 
+@app.route('/health')
+def health():
+    return jsonify({"status": "healthy"}), 200
+
 @app.route('/run-script', methods=['POST'])
 def run_script():
     try:
-        # Your existing code here
         data = request.json.get('data', '')
-        # ... rest of your function ...
+        if not data:
+            return jsonify({"status": "error", "message": "No data provided"}), 400
+
+        # Split the string into rows and group into columns
+        rows = [r.strip() for r in data.split(',') if r.strip()]
+        if len(rows) % 6 != 0:
+            return jsonify({"status": "error", "message": "Invalid data format"}), 400
+            
+        formatted_data = [rows[i:i+6] for i in range(0, len(rows), 6)]
+        
+        # Create a DataFrame
+        df = pd.DataFrame(formatted_data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+        
+        # Convert data types for numerical analysis
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        df[['open', 'high', 'low', 'close', 'volume']] = df[['open', 'high', 'low', 'close', 'volume']].astype(float)
+        
+        # Apply pandas_ta to calculate technical indicators
+        df['SMA'] = ta.sma(df['close'], length=3)
+        df['RSI'] = ta.rsi(df['close'])
+        
+        # Convert DataFrame to JSON for response
+        result = df.to_dict(orient='records')
         return jsonify({"status": "success", "data": result})
+        
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# Remove the if __name__ == "__main__" block for Heroku
-# Gunicorn will handle the running of the app
+# No if __name__ == '__main__' block needed for Heroku
