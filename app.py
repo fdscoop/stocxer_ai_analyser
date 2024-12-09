@@ -70,12 +70,19 @@ def run_script():
         df['SMA'] = df['close'].rolling(window=3).mean()
         df['RSI'] = ta.rsi(df['close'])
         
-        # Convert DataFrame to JSON for response
+        # Convert DataFrame to a list of dictionaries (JSON format)
         result = df.to_dict(orient='records')
-        return jsonify({
-            "status": "success", 
+
+        # Construct the JSON response
+        response = {
+            "status": "success",
             "data": result
-        })
+        }
+
+        # Log the response before returning (for debugging)
+        print("Response:", response)
+
+        return jsonify(response), 200
         
     except Exception as e:
         # Log the full traceback for server-side debugging
