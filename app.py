@@ -73,7 +73,7 @@ def run_script():
         # Convert DataFrame to a list of dictionaries (JSON format)
         result = df.to_dict(orient='records')
 
-        # Construct the JSON response
+        # Construct the JSON response as a dictionary, explicitly ensuring it's an object
         response = {
             "status": "success",
             "data": result
