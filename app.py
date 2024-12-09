@@ -2,13 +2,14 @@ import os
 from flask import Flask, request, jsonify
 import pandas as pd
 import pandas_ta as ta
+import traceback
 
 # Initialize Flask app
 app = Flask(__name__)
 
 @app.route('/')
 def index():
-    return "Welcome to the Stocxer Stock Analysis!"
+    return "Welcome to the Financial Data Analysis API!"
 
 @app.route('/health')
 def health():
@@ -17,14 +18,44 @@ def health():
 @app.route('/run-script', methods=['POST'])
 def run_script():
     try:
-        data = request.json.get('data', '')
-        if not data:
-            return jsonify({"status": "error", "message": "No data provided"}), 400
+        # Log the incoming request data for debugging
+        print("Incoming request data:", request.json)
+        print("Request content type:", request.content_type)
+        
+        # Check if the request is JSON
+        if not request.is_json:
+            return jsonify({
+                "status": "error", 
+                "message": "Request must be JSON",
+                "details": f"Received content type: {request.content_type}"
+            }), 400
+        
+        # Get data from JSON request
+        data = request.json
+        
+        # Check if 'data' key exists
+        if 'data' not in data:
+            return jsonify({
+                "status": "error", 
+                "message": "No 'data' key found in JSON"
+            }), 400
+        
+        # Get the data value
+        data_string = data.get('data', '')
+        
+        if not data_string:
+            return jsonify({
+                "status": "error", 
+                "message": "Empty data provided"
+            }), 400
         
         # Split the string into rows and group into columns
-        rows = [r.strip() for r in data.split(',') if r.strip()]
+        rows = [r.strip() for r in data_string.split(',') if r.strip()]
         if len(rows) % 6 != 0:
-            return jsonify({"status": "error", "message": "Invalid data format"}), 400
+            return jsonify({
+                "status": "error", 
+                "message": f"Invalid data format. Expected multiple of 6 elements, got {len(rows)}"
+            }), 400
             
         formatted_data = [rows[i:i+6] for i in range(0, len(rows), 6)]
         
@@ -39,15 +70,23 @@ def run_script():
         df['SMA'] = df['close'].rolling(window=3).mean()
         df['RSI'] = ta.rsi(df['close'])
         
-        # Convert DataFrame to dictionary for JSON response
+        # Convert DataFrame to JSON for response
         result = df.to_dict(orient='records')
-        
-        # Explicitly set the Content-Type to application/json
-        return jsonify({"status": "success", "data": result}), 200, {'Content-Type': 'application/json'}
+        return jsonify({
+            "status": "success", 
+            "data": result
+        })
         
     except Exception as e:
-        # In case of an error, return error message
-        return jsonify({"status": "error", "message": str(e)}), 500, {'Content-Type': 'application/json'}
+        # Log the full traceback for server-side debugging
+        print(f"Error processing request: {str(e)}")
+        print(traceback.format_exc())
+        
+        return jsonify({
+            "status": "error", 
+            "message": "Internal server error",
+            "details": str(e)
+        }), 500
 
 # Add this for Heroku deployment
 if __name__ == '__main__':
