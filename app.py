@@ -1,5 +1,5 @@
 import os
-from flask import Flask, request, jsonify, make_response
+from flask import Flask, request, make_response
 import pandas as pd
 import pandas_ta as ta
 import traceback
@@ -22,34 +22,19 @@ def run_script():
         print("Incoming request data:", request.json)
         
         if not request.is_json:
-            response = {
-                "response": {
-                    "status": "error",
-                    "message": "Request must be JSON"
-                }
-            }
+            response = {"response": {"status": "error", "message": "Request must be JSON"}}
             return make_response(response), 400
 
         data = request.json
         
         if 'data' not in data:
-            response = {
-                "response": {
-                    "status": "error",
-                    "message": "No 'data' key found in JSON"
-                }
-            }
+            response = {"response": {"status": "error", "message": "No 'data' key found in JSON"}}
             return make_response(response), 400
         
         data_string = data.get('data', '')
         
         if not data_string:
-            response = {
-                "response": {
-                    "status": "error",
-                    "message": "Empty data provided"
-                }
-            }
+            response = {"response": {"status": "error", "message": "Empty data provided"}}
             return make_response(response), 400
         
         rows = [r.strip() for r in data_string.split(',') if r.strip()]
@@ -65,7 +50,14 @@ def run_script():
         formatted_data = [rows[i:i+6] for i in range(0, len(rows), 6)]
         df = pd.DataFrame(formatted_data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
         
-        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        # Convert and set timestamp as DatetimeIndex
+        df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
+        df.set_index('timestamp', inplace=True)
+
+        if df.index.isnull().any():
+            response = {"response": {"status": "error", "message": "Invalid or missing timestamps"}}
+            return make_response(response), 400
+
         df[['open', 'high', 'low', 'close', 'volume']] = df[['open', 'high', 'low', 'close', 'volume']].astype(float)
         
         # Add technical indicators
@@ -83,9 +75,9 @@ def run_script():
         
         # Trend and decision analysis
         def analyze_trends(row):
-            if row['close'] > row['EMA_9'] and row['EMA_9'] > row['EMA_20']:
+            if row['close'] > row['EMA_9']:
                 return 'upward'
-            elif row['close'] < row['EMA_9'] and row['EMA_9'] < row['EMA_20']:
+            elif row['close'] < row['EMA_9']:
                 return 'downward'
             return 'sideways'
         
@@ -99,20 +91,13 @@ def run_script():
         df['Trend'] = df.apply(analyze_trends, axis=1)
         df['Recommendation'] = df.apply(make_decision, axis=1)
         
-        # SWOT analysis (Example logic)
-        swot = {
-            "strengths": ["High volume trades", "Strong upward trend"],
-            "weaknesses": ["Low closing price compared to EMA_200"],
-            "opportunities": ["Positive MACD divergence"],
-            "threats": ["Potential resistance at SMA_200"]
-        }
-        
-        result_list = df.to_dict(orient='records')
+        result_list = df.reset_index().to_dict(orient='records')  # Reset index to include 'timestamp' in JSON output
         result_object = {str(i): item for i, item in enumerate(result_list)}
         
         for key in result_object:
             result_object[key]['timestamp'] = result_object[key]['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
-            for field in ['SMA_9', 'SMA_20', 'SMA_50', 'SMA_200', 'EMA_9', 'EMA_20', 'EMA_50', 'EMA_200', 'MACD', 'Signal', 'Histogram', 'Momentum', 'WVAMP']:
+            for field in ['SMA_9', 'SMA_20', 'SMA_50', 'SMA_200', 'EMA_9', 'EMA_20', 'EMA_50', 'EMA_200', 
+                          'MACD', 'Signal', 'Histogram', 'Momentum', 'WVAMP']:
                 if pd.isna(result_object[key][field]):
                     result_object[key][field] = None
         
@@ -120,8 +105,7 @@ def run_script():
             "response": {
                 "status": "success",
                 "total_records": len(result_list),
-                "data": result_object,
-                "swot": swot
+                "data": result_object
             }
         }
         
