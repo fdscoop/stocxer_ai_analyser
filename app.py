@@ -60,6 +60,7 @@ def run_script():
 
         df[['open', 'high', 'low', 'close', 'volume']] = df[['open', 'high', 'low', 'close', 'volume']].astype(float)
         
+        
         # Add technical indicators
         df['SMA_9'] = df['close'].rolling(window=9).mean()
         df['SMA_20'] = df['close'].rolling(window=20).mean()
@@ -69,10 +70,16 @@ def run_script():
         df['EMA_20'] = ta.ema(df['close'], length=20)
         df['EMA_50'] = ta.ema(df['close'], length=50)
         df['EMA_200'] = ta.ema(df['close'], length=200)
-        df['MACD'], df['Signal'], df['Histogram'] = ta.macd(df['close'])
-        df['Momentum'] = ta.mom(df['close'])
-        df['WVAMP'] = ta.vwap(df['high'], df['low'], df['close'], df['volume'])
-        
+
+# Extract numerical values from MACD
+macd_df = ta.macd(df['close'])
+df['MACD'] = macd_df['MACD_12_26_9']
+df['Signal'] = macd_df['MACDs_12_26_9']
+df['Histogram'] = macd_df['MACDh_12_26_9']
+
+df['Momentum'] = ta.mom(df['close'])
+df['WVAMP'] = ta.vwap(df['high'], df['low'], df['close'], df['volume'])
+
         # Trend and decision analysis
         def analyze_trends(row):
             if row['close'] > row['EMA_9']:
