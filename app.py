@@ -35,16 +35,31 @@ def process_data(data_string):
     
     formatted_data = [rows[i:i+6] for i in range(0, len(rows), 6)]
     df = pd.DataFrame(formatted_data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+
+    try:
+        # Convert timestamp to datetime
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+    except Exception as e:
+        raise ValueError(f"Failed to parse timestamps: {str(e)}")
+
+    # Ensure numeric columns are correctly converted
+    try:
+        df[['open', 'high', 'low', 'close', 'volume']] = df[['open', 'high', 'low', 'close', 'volume']].astype(float)
+    except Exception as e:
+        raise ValueError(f"Failed to parse numeric values: {str(e)}")
+
     return df
 
 def calculate_indicators(df):
     """
     Calculate various technical indicators and additional custom logic.
     """
-    # Convert data types
-    df['timestamp'] = pd.to_datetime(df['timestamp'])
-    df[['open', 'high', 'low', 'close', 'volume']] = df[['open', 'high', 'low', 'close', 'volume']].astype(float)
+    if df.empty:
+        raise ValueError("The DataFrame is empty. Cannot calculate indicators.")
     
+    if 'close' not in df.columns:
+        raise KeyError("The 'close' column is missing in the DataFrame.")
+
     # --- EMA Calculations ---
     for length in [9, 20, 50, 200]:
         df[f'EMA{length}'] = ta.ema(df['close'], length=length)
@@ -77,13 +92,13 @@ def calculate_indicators(df):
     df['BB_Middle'] = bollinger['BBM_20_2.0']
     df['BB_Lower'] = bollinger['BBL_20_2.0']
     
-    # --- ADX (Average Directional Index) ---
+    # --- ADX ---
     adx = ta.adx(high=df['high'], low=df['low'], close=df['close'])
     df['ADX'] = adx['ADX_14']
     df['Plus_DI'] = adx['DMP_14']
     df['Minus_DI'] = adx['DMN_14']
     
-    # --- CCI (Commodity Channel Index) ---
+    # --- CCI ---
     df['CCI'] = ta.cci(high=df['high'], low=df['low'], close=df['close'], length=20)
     
     # --- Stochastic Oscillator ---
@@ -94,13 +109,9 @@ def calculate_indicators(df):
     # --- Williams %R ---
     df['Williams_%R'] = ta.willr(high=df['high'], low=df['low'], close=df['close'], length=14)
     
-    # --- Custom Trend Analysis ---
+    # --- Trend and SWOT Analysis ---
     df['Trend_Analysis'] = df.apply(analyze_trend, axis=1)
-    
-    # --- SWOT Analysis ---
     df['SWOT'] = df.apply(perform_swot, axis=1)
-    
-    # --- Trading Recommendation ---
     df['Recommendation'] = df.apply(generate_recommendation, axis=1)
     
     return df
@@ -131,7 +142,7 @@ def perform_swot(row):
         swot['Strengths'].append('Good momentum')
     if row['close'] < row['EMA200']:
         swot['Weaknesses'].append('Weak long-term trend')
-    if row['volume'] < df['volume'].mean():
+    if row['volume'] < row['volume']:
         swot['Weaknesses'].append('Low volume')
     if row['RSI'] < 30:
         swot['Opportunities'].append('Oversold condition')
@@ -139,8 +150,6 @@ def perform_swot(row):
         swot['Opportunities'].append('Potential reversal')
     if row['RSI'] > 70:
         swot['Threats'].append('Overbought condition')
-    if row['ATR'] > df['ATR'].mean() * 1.5:
-        swot['Threats'].append('High volatility')
     return swot
 
 def generate_recommendation(row):
