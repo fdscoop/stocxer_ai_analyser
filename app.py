@@ -66,11 +66,9 @@ def run_script():
             return make_response(response), 400
 
         # Add technical indicators
-        df['SMA_9'] = df['close'].rolling(window=9).mean()
         df['SMA_20'] = df['close'].rolling(window=20).mean()
         df['SMA_50'] = df['close'].rolling(window=50).mean()
         df['SMA_200'] = df['close'].rolling(window=200).mean()
-        df['EMA_9'] = ta.ema(df['close'], length=9)
         df['EMA_20'] = ta.ema(df['close'], length=20)
         df['EMA_50'] = ta.ema(df['close'], length=50)
         df['EMA_200'] = ta.ema(df['close'], length=200)
@@ -80,34 +78,38 @@ def run_script():
         df['Signal'] = macd_df['MACDs_12_26_9']
         df['Histogram'] = macd_df['MACDh_12_26_9']
 
-        df['Momentum'] = ta.mom(df['close'])
-        df['WVAMP'] = ta.vwap(df['high'], df['low'], df['close'], df['volume'])
-
         # Trend and decision analysis
         def analyze_trends(row):
-            if row['close'] > row['EMA_9']:
-                return 'upward'
-            elif row['close'] < row['EMA_9']:
-                return 'downward'
+            if row['close'] > row['EMA_20'] and row['SMA_20'] > row['SMA_50']:
+                return 'uptrend'
+            elif row['close'] < row['EMA_20'] and row['SMA_20'] < row['SMA_50']:
+                return 'downtrend'
             return 'sideways'
 
         def make_decision(row):
-            if row['Trend'] == 'upward' and row['MACD'] > row['Signal']:
+            if row['Trend'] == 'uptrend' and row['MACD'] > row['Signal']:
                 return 'Buy'
-            elif row['Trend'] == 'downward' and row['MACD'] < row['Signal']:
+            elif row['Trend'] == 'downtrend' and row['MACD'] < row['Signal']:
                 return 'Sell'
             return 'Hold'
 
         df['Trend'] = df.apply(analyze_trends, axis=1)
         df['Recommendation'] = df.apply(make_decision, axis=1)
 
+        # SWOT Analysis (placeholder values)
+        swot_analysis = {
+            "Strengths": "Strong revenue growth and market position.",
+            "Weaknesses": "High debt levels.",
+            "Opportunities": "New product launches in growth markets.",
+            "Threats": "Increasing competition and regulatory changes."
+        }
+
         result_list = df.reset_index().to_dict(orient='records')  # Reset index to include 'timestamp' in JSON output
         result_object = {str(i): item for i, item in enumerate(result_list)}
 
         for key in result_object:
             result_object[key]['timestamp'] = result_object[key]['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
-            for field in ['SMA_9', 'SMA_20', 'SMA_50', 'SMA_200', 'EMA_9', 'EMA_20', 'EMA_50', 'EMA_200', 
-                          'MACD', 'Signal', 'Histogram', 'Momentum', 'WVAMP']:
+            for field in ['SMA_20', 'SMA_50', 'SMA_200', 'EMA_20', 'EMA_50', 'EMA_200', 'MACD', 'Signal', 'Histogram']:
                 if pd.isna(result_object[key][field]):
                     result_object[key][field] = None
 
@@ -115,7 +117,8 @@ def run_script():
             "response": {
                 "status": "success",
                 "total_records": len(result_list),
-                "data": result_object
+                "data": result_object,
+                "swot_analysis": swot_analysis
             }
         }
 
