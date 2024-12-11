@@ -3,7 +3,7 @@ from flask import Flask, request, jsonify, make_response
 import pandas as pd
 import pandas_ta as ta
 import traceback
-import json 
+import json
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -19,104 +19,123 @@ def health():
 @app.route('/run-script', methods=['POST'])
 def run_script():
     try:
-        # Log the incoming request data for debugging
         print("Incoming request data:", request.json)
         
-        # Check if the request is JSON
         if not request.is_json:
             response = {
                 "response": {
-                    "status": "error", 
+                    "status": "error",
                     "message": "Request must be JSON"
                 }
             }
             return make_response(response), 400
-        
-        # Get data from JSON request
+
         data = request.json
         
-        # Check if 'data' key exists
         if 'data' not in data:
             response = {
                 "response": {
-                    "status": "error", 
+                    "status": "error",
                     "message": "No 'data' key found in JSON"
                 }
             }
             return make_response(response), 400
         
-        # Get the data value
         data_string = data.get('data', '')
         
         if not data_string:
             response = {
                 "response": {
-                    "status": "error", 
+                    "status": "error",
                     "message": "Empty data provided"
                 }
             }
             return make_response(response), 400
         
-        # Split the string into rows and group into columns
         rows = [r.strip() for r in data_string.split(',') if r.strip()]
         if len(rows) % 6 != 0:
             response = {
                 "response": {
-                    "status": "error", 
+                    "status": "error",
                     "message": f"Invalid data format. Expected multiple of 6 elements, got {len(rows)}"
                 }
             }
             return make_response(response), 400
             
         formatted_data = [rows[i:i+6] for i in range(0, len(rows), 6)]
-        
-        # Create a DataFrame
         df = pd.DataFrame(formatted_data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
         
-        # Convert data types for numerical analysis
         df['timestamp'] = pd.to_datetime(df['timestamp'])
         df[['open', 'high', 'low', 'close', 'volume']] = df[['open', 'high', 'low', 'close', 'volume']].astype(float)
         
-        # Apply pandas_ta to calculate technical indicators
-        df['SMA'] = df['close'].rolling(window=3).mean()
-        df['RSI'] = ta.rsi(df['close'])
+        # Add technical indicators
+        df['SMA_9'] = df['close'].rolling(window=9).mean()
+        df['SMA_20'] = df['close'].rolling(window=20).mean()
+        df['SMA_50'] = df['close'].rolling(window=50).mean()
+        df['SMA_200'] = df['close'].rolling(window=200).mean()
+        df['EMA_9'] = ta.ema(df['close'], length=9)
+        df['EMA_20'] = ta.ema(df['close'], length=20)
+        df['EMA_50'] = ta.ema(df['close'], length=50)
+        df['EMA_200'] = ta.ema(df['close'], length=200)
+        df['MACD'], df['Signal'], df['Histogram'] = ta.macd(df['close'])
+        df['Momentum'] = ta.mom(df['close'])
+        df['WVAMP'] = ta.vwap(df['high'], df['low'], df['close'], df['volume'])
         
-        # Convert DataFrame to a list of dictionaries
+        # Trend and decision analysis
+        def analyze_trends(row):
+            if row['close'] > row['EMA_9'] and row['EMA_9'] > row['EMA_20']:
+                return 'upward'
+            elif row['close'] < row['EMA_9'] and row['EMA_9'] < row['EMA_20']:
+                return 'downward'
+            return 'sideways'
+        
+        def make_decision(row):
+            if row['Trend'] == 'upward' and row['MACD'] > row['Signal']:
+                return 'Buy'
+            elif row['Trend'] == 'downward' and row['MACD'] < row['Signal']:
+                return 'Sell'
+            return 'Hold'
+        
+        df['Trend'] = df.apply(analyze_trends, axis=1)
+        df['Recommendation'] = df.apply(make_decision, axis=1)
+        
+        # SWOT analysis (Example logic)
+        swot = {
+            "strengths": ["High volume trades", "Strong upward trend"],
+            "weaknesses": ["Low closing price compared to EMA_200"],
+            "opportunities": ["Positive MACD divergence"],
+            "threats": ["Potential resistance at SMA_200"]
+        }
+        
         result_list = df.to_dict(orient='records')
-        
-        # Convert the list to an object with numeric keys
         result_object = {str(i): item for i, item in enumerate(result_list)}
         
-        # Format datetime objects to string
         for key in result_object:
             result_object[key]['timestamp'] = result_object[key]['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
-            # Handle NaN and None values
-            for field in ['SMA', 'RSI']:
+            for field in ['SMA_9', 'SMA_20', 'SMA_50', 'SMA_200', 'EMA_9', 'EMA_20', 'EMA_50', 'EMA_200', 'MACD', 'Signal', 'Histogram', 'Momentum', 'WVAMP']:
                 if pd.isna(result_object[key][field]):
                     result_object[key][field] = None
         
-        # Create the response object
         response = {
             "response": {
                 "status": "success",
                 "total_records": len(result_list),
-                "data": result_object
+                "data": result_object,
+                "swot": swot
             }
         }
         
-        # Create response with proper content type
         resp = make_response(response)
         resp.headers['Content-Type'] = 'application/json'
         return resp, 200
         
     except Exception as e:
-        # Log the full traceback for server-side debugging
         print(f"Error processing request: {str(e)}")
         print(traceback.format_exc())
         
         response = {
             "response": {
-                "status": "error", 
+                "status": "error",
                 "message": "Internal server error",
                 "details": str(e)
             }
@@ -125,4 +144,4 @@ def run_script():
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port) 
+    app.run(host='0.0.0.0', port=port)
