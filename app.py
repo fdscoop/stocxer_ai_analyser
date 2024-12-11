@@ -77,6 +77,13 @@ def run_script():
         df['MACD'] = macd_df['MACD_12_26_9']
         df['Signal'] = macd_df['MACDs_12_26_9']
         df['Histogram'] = macd_df['MACDh_12_26_9']
+        df['RSI'] = ta.rsi(df['close'])
+        df['ADX'] = ta.adx(df['high'], df['low'], df['close'])['ADX_14']
+
+        # Calculate support and resistance levels (Pivot Points)
+        df['Pivot'] = (df['high'] + df['low'] + df['close']) / 3
+        df['Support_1'] = 2 * df['Pivot'] - df['high']
+        df['Resistance_1'] = 2 * df['Pivot'] - df['low']
 
         # Trend and decision analysis
         def analyze_trends(row):
@@ -87,21 +94,49 @@ def run_script():
             return 'sideways'
 
         def make_decision(row):
-            if row['Trend'] == 'uptrend' and row['MACD'] > row['Signal']:
+            if row['Trend'] == 'uptrend' and row['MACD'] > row['Signal'] and row['RSI'] < 70:
                 return 'Buy'
-            elif row['Trend'] == 'downtrend' and row['MACD'] < row['Signal']:
+            elif row['Trend'] == 'downtrend' and row['MACD'] < row['Signal'] and row['RSI'] > 30:
                 return 'Sell'
             return 'Hold'
 
         df['Trend'] = df.apply(analyze_trends, axis=1)
         df['Recommendation'] = df.apply(make_decision, axis=1)
 
-        # SWOT Analysis (placeholder values)
-        swot_analysis = {
-            "Strengths": "Strong revenue growth and market position.",
-            "Weaknesses": "High debt levels.",
-            "Opportunities": "New product launches in growth markets.",
-            "Threats": "Increasing competition and regulatory changes."
+        # SWOT Analysis based on technical conditions
+        def generate_swot(trend):
+            if trend == 'uptrend':
+                return {
+                    "Strengths": "Strong upward momentum and positive market sentiment.",
+                    "Weaknesses": "Potential overbought conditions.",
+                    "Opportunities": "High probability of breakout above resistance levels.",
+                    "Threats": "Market corrections and profit booking."
+                }
+            elif trend == 'downtrend':
+                return {
+                    "Strengths": "Clear downward momentum for short selling.",
+                    "Weaknesses": "Potential oversold conditions.",
+                    "Opportunities": "Good entry points for value investing.",
+                    "Threats": "Reversal risk due to support levels."
+                }
+            else:
+                return {
+                    "Strengths": "Stable price movement.",
+                    "Weaknesses": "Lack of clear direction.",
+                    "Opportunities": "Potential for breakout or breakdown.",
+                    "Threats": "Indecisive market conditions."
+                }
+
+        swot_analysis = generate_swot(df.iloc[-1]['Trend'])
+
+        # Generate report
+        report = {
+            "summary": {
+                "current_trend": df.iloc[-1]['Trend'],
+                "recommendation": df.iloc[-1]['Recommendation']
+            },
+            "technical_indicators": df.iloc[-1].to_dict(),
+            "swot_analysis": swot_analysis
         }
 
         result_list = df.reset_index().to_dict(orient='records')  # Reset index to include 'timestamp' in JSON output
@@ -109,7 +144,7 @@ def run_script():
 
         for key in result_object:
             result_object[key]['timestamp'] = result_object[key]['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
-            for field in ['SMA_20', 'SMA_50', 'SMA_200', 'EMA_20', 'EMA_50', 'EMA_200', 'MACD', 'Signal', 'Histogram']:
+            for field in ['SMA_20', 'SMA_50', 'SMA_200', 'EMA_20', 'EMA_50', 'EMA_200', 'MACD', 'Signal', 'Histogram', 'RSI', 'ADX']:
                 if pd.isna(result_object[key][field]):
                     result_object[key][field] = None
 
@@ -118,7 +153,7 @@ def run_script():
                 "status": "success",
                 "total_records": len(result_list),
                 "data": result_object,
-                "swot_analysis": swot_analysis
+                "report": report
             }
         }
 
