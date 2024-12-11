@@ -95,6 +95,9 @@ def run_script():
         df['timestamp'] = pd.to_datetime(df['timestamp'])
         df[['open', 'high', 'low', 'close', 'volume']] = df[['open', 'high', 'low', 'close', 'volume']].astype(float)
 
+        # Explicitly create a RangeIndex
+        df = df.reset_index(drop=True)
+
         # Calculate EMAs
         df['EMA9'] = ta.ema(df['close'], length=9)
         df['EMA20'] = ta.ema(df['close'], length=20)
@@ -246,8 +249,8 @@ def run_script():
         df['SWOT'] = df.apply(perform_swot, axis=1)
         df['Recommendation'] = df.apply(generate_recommendation, axis=1)
 
-        # Convert DataFrame to a list of dictionaries
-        result_list = df.reset_index().to_dict(orient='records')
+        # Convert DataFrame to list of dictionaries
+        result_list = df.to_dict(orient='records')
 
         # Convert the list to an object with numeric keys
         result_object = {str(i): item for i, item in enumerate(result_list)}
