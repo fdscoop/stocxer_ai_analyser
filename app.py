@@ -149,26 +149,32 @@ def run_script():
             "swot_analysis": generate_swot(df.iloc[-1]['Trend'])
         }
         
-        # Convert DataFrame to a list of arrays
-        result_list = df.reset_index().values.tolist()
-
-        # Prepare response with list of arrays
+        # Convert DataFrame to JSON-serializable format
+        result_list = df.reset_index().to_dict(orient='records')
+        result_object = {str(i): item for i, item in enumerate(result_list)}
+        
+        # Convert timestamp to string
+        for key in result_object:
+            result_object[key]['timestamp'] = result_object[key]['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
+            
+            # Handle NaN values
+            for field in ['SMA_20', 'SMA_50', 'SMA_200', 'EMA_20', 'EMA_50', 'EMA_200', 
+                          'MACD', 'Signal', 'Histogram', 'RSI', 'ADX']:
+                if pd.isna(result_object[key][field]):
+                    result_object[key][field] = None
+        
+        # Prepare response
         response = {
             "response": {
                 "status": "success",
                 "total_records": len(result_list),
-                "data": result_list,
-                "columns": ['timestamp', 'open', 'high', 'low', 'close', 'volume', 
-                            'SMA_20', 'SMA_50', 'SMA_200', 'EMA_20', 'EMA_50', 'EMA_200', 
-                            'MACD', 'Signal', 'Histogram', 'RSI', 'ADX', 'Trend', 'Recommendation'],
+                "data": result_object,
                 "report": report
             }
         }
-
-        # Serialize response to JSON and set headers
-        resp = make_response(json.dumps(response))
+        
+        resp = make_response(response)
         resp.headers['Content-Type'] = 'application/json'
-        print("Generated Response:", json.dumps(response, indent=2))  # Debug log to verify response structure
         return resp, 200
     
     except Exception as e:
@@ -181,7 +187,7 @@ def run_script():
                 "details": str(e)
             }
         }
-        return make_response(json.dumps(response)), 500
+        return make_response(response), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
