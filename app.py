@@ -5,7 +5,6 @@ import pandas_ta as ta
 import traceback
 import json
 from datetime import datetime
-import numpy as np
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -22,15 +21,12 @@ def validate_request(request_data):
     """Validate incoming request data"""
     if not request_data.is_json:
         return False, "Request must be JSON"
-    
     data = request_data.json
     if 'data' not in data:
         return False, "No 'data' key found in JSON"
-    
     data_string = data.get('data', '')
     if not data_string:
         return False, "Empty data provided"
-    
     return True, data_string
 
 def prepare_dataframe(data_string):
@@ -86,77 +82,6 @@ def calculate_technical_indicators(df):
     
     return df
 
-def calculate_price_levels(df, last_record):
-    """
-    Calculate advanced price levels with multiple strategies
-    
-    Args:
-        df (pandas.DataFrame): Full dataframe of price data
-        last_record (dict): Last record in the dataframe
-    
-    Returns:
-        dict: Calculated price levels with multiple strategies
-    """
-    # Get current price and key technical indicators
-    current_close = last_record['close']
-    trend = last_record['Trend']
-    
-    # Calculate volatility (Average True Range)
-    atr_14 = ta.atr(df['high'], df['low'], df['close'], length=14)[-1]
-    
-    # Support and Resistance Calculation
-    support_levels = [
-        last_record['SMA_20'],    # 20-day Moving Average Support
-        last_record['SMA_50'],    # 50-day Moving Average Support
-        current_close * 0.95,     # 5% below current price
-        current_close - atr_14    # One ATR below current price
-    ]
-    
-    resistance_levels = [
-        last_record['SMA_20'],    # 20-day Moving Average Resistance
-        last_record['SMA_50'],    # 50-day Moving Average Resistance
-        current_close * 1.05,     # 5% above current price
-        current_close + atr_14    # One ATR above current price
-    ]
-    
-    # Price Level Calculation Strategies
-    price_strategies = {
-        'uptrend': {
-            'buy_price': max(support_levels),  # Most robust support level
-            'sell_price': max(resistance_levels),  # Break-out resistance
-            'stop_loss': current_close * 0.90,  # 10% below entry
-            'first_target': current_close * 1.05,  # 5% gain
-            'second_target': current_close * 1.10,  # 10% gain
-            'risk_reward_ratio': 2.0  # 2:1 Risk-Reward
-        },
-        'downtrend': {
-            'buy_price': min(support_levels),  # Potential bounce point
-            'sell_price': min(resistance_levels),  # Selling at resistance
-            'stop_loss': current_close * 1.10,  # 10% above entry
-            'first_target': current_close * 0.95,  # 5% gain in downtrend
-            'second_target': current_close * 0.90,  # 10% gain in downtrend
-            'risk_reward_ratio': 1.5  # More conservative
-        },
-        'sideways': {
-            'buy_price': current_close * 0.98,  # Slightly below current price
-            'sell_price': current_close * 1.02,  # Slightly above current price
-            'stop_loss': current_close * 0.95,  # 5% below current price
-            'first_target': current_close * 1.03,  # 3% potential gain
-            'second_target': current_close * 1.05,  # 5% potential gain
-            'risk_reward_ratio': 1.0  # Balanced approach
-        }
-    }
-    
-    # Retrieve price levels based on current trend, default to sideways
-    price_levels = price_strategies.get(trend, price_strategies['sideways'])
-    
-    # Round price levels to two decimal places
-    for key in price_levels:
-        if isinstance(price_levels[key], (int, float)):
-            price_levels[key] = round(price_levels[key], 2)
-    
-    return price_levels
-
 def analyze_market(df):
     """Perform market analysis and generate recommendations"""
     def analyze_trends(row):
@@ -180,7 +105,6 @@ def analyze_market(df):
 
 def generate_swot(trend):
     """Generate SWOT analysis based on trend"""
-    # (Same implementation as in previous version)
     swot_analysis = {
         'uptrend': {
             "Strengths": [
@@ -249,17 +173,80 @@ def generate_swot(trend):
             ]
         }
     }
-    
     return swot_analysis.get(trend, swot_analysis['sideways'])
+
+# NEW FUNCTION: Calculate Price Targets
+def calculate_price_targets(df, last_record):
+    """
+    Calculate buy, sell, stop loss, and target prices based on market analysis
+    
+    Args:
+    df (pandas.DataFrame): Processed financial data
+    last_record (dict): Most recent market data record
+    
+    Returns:
+    dict: Calculated price targets and strategies
+    """
+    # Retrieve key price and indicator values
+    close_price = last_record['close']
+    
+    # Calculate ATR (Average True Range)
+    try:
+        # Ensure we have enough data for ATR calculation
+        if len(df) >= 14:
+            atr = ta.atr(df['high'], df['low'], df['close'], length=14)[-1]
+        else:
+            atr = close_price * 0.02  # Default to 2% if not enough data
+    except Exception:
+        atr = close_price * 0.02  # Fallback value
+    
+    # Price Target Calculation Strategies
+    price_targets = {
+        'uptrend': {
+            'strategy': 'Momentum Breakout',
+            'buy_price': round(close_price * 1.005, 2),  # 0.5% above current close
+            'sell_price': round(close_price * 1.02, 2),  # 2% above current close
+            'stop_loss': round(close_price * 0.98, 2),   # 2% below current close
+            'target_price': round(close_price * 1.05, 2) # 5% above current close
+        },
+        'downtrend': {
+            'strategy': 'Reversal Bounce',
+            'buy_price': round(close_price * 0.97, 2),  # 3% below current close
+            'sell_price': round(close_price * 0.95, 2), # 5% below current close
+            'stop_loss': round(close_price * 0.93, 2),  # 7% below current close
+            'target_price': round(close_price * 0.90, 2) # 10% below current close
+        },
+        'sideways': {
+            'strategy': 'Range Trading',
+            'buy_price': round(close_price * 1.01, 2),  # 1% above current close
+            'sell_price': round(close_price * 0.99, 2), # 1% below current close
+            'stop_loss': round(close_price * 0.97, 2),  # 3% below current close
+            'target_price': round(close_price * 1.03, 2) # 3% above current close
+        }
+    }
+    
+    # Select price targets based on current trend
+    trend = last_record.get('Trend', 'sideways')
+    targets = price_targets.get(trend, price_targets['sideways'])
+    
+    # Advanced Risk Management
+    targets['risk_reward_ratio'] = round(
+        abs(targets['target_price'] - targets['buy_price']) / 
+        abs(targets['buy_price'] - targets['stop_loss']), 
+        2
+    )
+    
+    # Volatility Adjustment
+    targets['volatility_atr'] = round(atr, 2)
+    
+    return targets
 
 def prepare_bubble_response(df, last_record):
     """Prepare response data in Bubble-friendly format"""
-    # (Similar to previous implementation, with added price levels)
     records = []
-    
     for index, row in df.reset_index().iterrows():
         record = {
-            "id": index + 1,
+            "id": index + 1,  # Bubble-friendly unique identifier
             "timestamp": row['timestamp'].strftime('%Y-%m-%d %H:%M:%S'),
             "price_data": {
                 "open": float(row['open']),
@@ -268,12 +255,33 @@ def prepare_bubble_response(df, last_record):
                 "close": float(row['close']),
                 "volume": float(row['volume'])
             },
-            # (Rest of the record remains the same)
+            "moving_averages": {
+                "sma": {
+                    "20": float(row['SMA_20']) if pd.notna(row['SMA_20']) else 0,
+                    "50": float(row['SMA_50']) if pd.notna(row['SMA_50']) else 0,
+                    "200": float(row['SMA_200']) if pd.notna(row['SMA_200']) else 0
+                },
+                "ema": {
+                    "20": float(row['EMA_20']) if pd.notna(row['EMA_20']) else 0,
+                    "50": float(row['EMA_50']) if pd.notna(row['EMA_50']) else 0,
+                    "200": float(row['EMA_200']) if pd.notna(row['EMA_200']) else 0
+                }
+            },
+            "indicators": {
+                "macd": {
+                    "value": float(row['MACD']) if pd.notna(row['MACD']) else 0,
+                    "signal": float(row['Signal']) if pd.notna(row['Signal']) else 0,
+                    "histogram": float(row['Histogram']) if pd.notna(row['Histogram']) else 0
+                },
+                "rsi": float(row['RSI']) if pd.notna(row['RSI']) else 0,
+                "adx": float(row['ADX']) if pd.notna(row['ADX']) else 0
+            },
+            "analysis": {
+                "trend": row['Trend'],
+                "recommendation": row['Recommendation']
+            }
         }
         records.append(record)
-    
-    # Calculate price levels
-    price_levels = calculate_price_levels(df, last_record)
     
     # Generate market summary
     market_summary = {
@@ -283,23 +291,25 @@ def prepare_bubble_response(df, last_record):
         "daily_change_percent": float((last_record['close'] - last_record['open']) / last_record['open'] * 100),
         "volume": float(last_record['volume']),
         "current_trend": last_record['Trend'],
-        "recommendation": last_record['Recommendation'],
-        "price_levels": price_levels
+        "recommendation": last_record['Recommendation']
     }
     
     # Generate SWOT analysis
     swot = generate_swot(last_record['Trend'])
     
+    # Calculate Price Targets
+    price_targets = calculate_price_targets(df, last_record)
+    
     return {
         "meta": {
             "total_records": len(records),
             "market_summary": market_summary,
-            "swot_analysis": swot
+            "swot_analysis": swot,
+            "price_targets": price_targets
         },
         "data": records
     }
 
-# Rest of the Flask application remains the same as in the previous implementation
 @app.route('/run-script', methods=['POST'])
 def run_script():
     try:
